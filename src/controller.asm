@@ -172,21 +172,28 @@ remaining_loop:
 .endproc
 
 .proc init_sprites
-  LDA #0
+  LDA #4
   STA SPRITE_0_ADDR + SPRITE_OFFSET_TILE
-  LDA #1
+  LDA #5
   STA SPRITE_1_ADDR + SPRITE_OFFSET_TILE
+  LDA #14
+  STA SPRITE_2_ADDR + SPRITE_OFFSET_TILE
 
-  LDA #$20
+  LDA #20
   STA player_y
 
   STA SPRITE_0_ADDR + SPRITE_OFFSET_Y
   STA SPRITE_1_ADDR + SPRITE_OFFSET_Y
 
-  LDA #$30
+  CLC
+  ADC #8
+  STA SPRITE_2_ADDR + SPRITE_OFFSET_Y
+
+  LDA #30
   STA player_x
 
   STA SPRITE_0_ADDR + SPRITE_OFFSET_X
+  STA SPRITE_2_ADDR + SPRITE_OFFSET_X
 
   CLC
   ADC #8
@@ -229,6 +236,43 @@ remaining_loop:
 .endproc
 
 .proc update_player
+    LDA controller_1
+    AND #PAD_L
+    BEQ not_left
+      LDX player_x
+      DEX
+      STX player_x
+not_left:
+    LDA controller_1
+    AND #PAD_R
+    BEQ not_right
+      LDX player_x
+      INX
+      STX player_x
+not_right:
+    LDA controller_1
+    AND #PAD_U
+    BEQ not_up
+      LDX player_y
+      DEX
+      STX player_y
+not_up:
+    LDA controller_1
+    AND #PAD_D
+    BEQ not_down
+      LDX player_y
+      INX
+      STX player_y
+not_down:
+    ; Update player sprite position
+    LDA player_x
+    STA SPRITE_0_ADDR + SPRITE_OFFSET_X
+    CLC
+    ADC #8
+    STA SPRITE_1_ADDR + SPRITE_OFFSET_X
+    LDA player_y
+    STA SPRITE_0_ADDR + SPRITE_OFFSET_Y
+    STA SPRITE_1_ADDR + SPRITE_OFFSET_Y
 
     RTS                       ; Return to caller
 .endproc
@@ -377,7 +421,7 @@ nametable_data:
   BPL :-                  ; Branch if Plus (bit 7 = 0, no VBlank)
                           ; Loop until VBlank flag is set
 
-  clear_ram
+  ;clear_ram
   clear_oam oam
 
   ; Second VBlank wait - ensures PPU is fully ready
