@@ -369,40 +369,133 @@ not_left:
 .endproc
 
 .proc update_ball
-; now move our ball
- 	lda ball_y; get the current Y
-	clc
-	adc ball_dy ; add the Y velocity
- 	sta ball_y ; write the change
- 	cmp #0 ; have we hit the top border
- 	bne NOT_HITTOP
- 		lda #1 ; reverse direction
- 		sta ball_dy
- NOT_HITTOP:
- 	lda ball_y
- 	cmp #210 ; have we hit the bottom border
- 	bne NOT_HITBOTTOM
- 		lda #$FF ; reverse direction (-1)
- 		sta ball_dy
- NOT_HITBOTTOM:
- 	lda ball_x ; get the current x
- 	clc
- 	adc ball_dx	; add the X velocity
- 	sta ball_x
- 	cmp #0 ; have we hit the left border
- 	bne NOT_HITLEFT
- 		lda #1 ; reverse direction
- 		sta ball_dx
- NOT_HITLEFT:
- 	lda ball_x
- 	cmp #248 ; have we hit the right border
- 	bne NOT_HITRIGHT
- 		lda #$FF ; reverse direction (-1)
- 		sta ball_dx
- NOT_HITRIGHT:
+    ; Move the ball first
+    lda ball_y
+    clc
+    adc ball_dy
+    sta ball_y
 
- RTS
- .endproc
+    lda ball_x
+    clc
+    adc ball_dx
+    sta ball_x
+
+    ; Bounce off top wall
+    lda ball_y
+    cmp #$00
+    bne NOT_HITTOP
+        lda #$01
+        sta ball_dy
+NOT_HITTOP:
+
+    ; Bounce off bottom wall (NES screen height ~240px, safe edge ~210px)
+    lda ball_y
+    cmp #$D2          ; 210 decimal = $D2
+    bne NOT_HITBOTTOM
+        lda #$FF
+        sta ball_dy
+NOT_HITBOTTOM:
+
+    ; Bounce off left wall
+    lda ball_x
+    cmp #$00
+    bne NOT_HITLEFT
+        lda #$01
+        sta ball_dx
+NOT_HITLEFT:
+
+    ; Bounce off right wall
+    lda ball_x
+    cmp #$F8          ; 248 decimal = $F8
+    bne NOT_HITRIGHT
+        lda #$FF
+        sta ball_dx
+NOT_HITRIGHT:
+
+; --- Player Collision Detection and Response ---
+
+; Compute horizontal distance |ball_x - player_x|
+lda ball_x         ; Load ball's X position
+sec                ; Set carry for subtraction
+sbc player_x       ; Subtract player's X position
+bpl x_ok           ; If result is positive, skip absolute value conversion
+    eor #$FF       ; Else, take two's complement to get absolute value
+    clc
+    adc #1
+x_ok:
+cmp #24            ; Compare distance to 24 pixels
+bcs no_player_collision ; If >= 24, no collision in X direction
+
+; Compute vertical distance |ball_y - player_y|
+lda ball_y         ; Load ball's Y position
+sec
+sbc player_y
+bpl y_ok
+    eor #$FF
+    clc
+    adc #1
+y_ok:
+cmp #24            ; Compare distance to 24 pixels
+bcs no_player_collision ; If >= 24, no collision in Y direction
+
+; At this point, collision has occurred
+
+; Compute delta X for later comparison
+lda ball_x
+sec
+sbc player_x
+bpl dx_ok
+    eor #$FF
+    clc
+    adc #1
+dx_ok:
+sta temp_var       ; Store |dx| in temp_var
+
+; Compute delta Y for later comparison
+lda ball_y
+sec
+sbc player_y
+bpl dy_ok
+    eor #$FF
+    clc
+    adc #1
+dy_ok:
+sta temp_var2      ; Store |dy| in temp_var2
+
+; Decide whether to bounce horizontally or vertically
+lda temp_var
+cmp temp_var2
+bcc bounce_y       ; If |dx| < |dy|, bounce vertically
+bcs bounce_x       ; If |dx| >= |dy|, bounce horizontally
+
+; --- Bounce vertically ---
+bounce_y:
+lda ball_dy        ; Invert Y velocity
+eor #$FF
+clc
+adc #1
+sta ball_dy
+jmp done_collision
+
+; --- Bounce horizontally ---
+bounce_x:
+lda ball_dx        ; Invert X velocity
+eor #$FF
+clc
+adc #1
+sta ball_dx
+jmp done_collision
+
+; --- No collision detected ---
+no_player_collision:
+
+; --- Exit ---
+done_collision:
+RTS                ; Return from subroutine
+
+
+.endproc
+
 
 ;******************************************************************************
 ; Procedure: main
